@@ -1,0 +1,18 @@
+{
+  "active_days": [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday"
+  ],
+  "time_ranges": [
+    {
+      "start": "08:00",
+      "end": "18:15"
+    }
+  ],
+  "email_report_receiver": "dilanmamanip@gmail.com"
+}

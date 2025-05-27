@@ -17,6 +17,12 @@ import dlib
 import json
 import csv
 import cv2
+import subprocess
+import platform
+import os
+
+# Ruta del archivo de configuración de horario
+SCHEDULE_PATH = "utils/schedule_config.json"
 
 # execution start time
 start_time = time.time()
@@ -59,14 +65,14 @@ def log_data(move_in, in_time, move_out, out_time):
 	with open('utils/data/logs/counting_data.csv', 'w', newline = '') as myfile:
 		wr = csv.writer(myfile, quoting = csv.QUOTE_ALL)
 		if myfile.tell() == 0: # check if header rows are already existing
-			wr.writerow(("Move In", "In Time", "Move Out", "Out Time"))
+			wr.writerow(("Entradas", "Hora Entrada", "Salidas", "Hora Salida"))
 			wr.writerows(export_data)
 
 def people_counter():
 	# main function for people_counter.py
 	args = parse_arguments()
 	# initialize the list of class labels MobileNet SSD was trained to detect
-	CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
+	CLASSES = ["fondo", "aeroplane", "bicycle", "bird", "boat",
 		"bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
 		"dog", "horse", "motorbike", "person", "pottedplant", "sheep",
 		"sofa", "train", "tvmonitor"]
@@ -76,14 +82,14 @@ def people_counter():
 
 	# if a video path was not supplied, grab a reference to the ip camera
 	if not args.get("input", False):
-		logger.info("Starting the live stream..")
-		vs = VideoStream(config["url"]).start()
+		logger.info("Iniciando la transmisión en vivo...")
+		vs = cv2.VideoCapture(config["url"])
 		time.sleep(2.0)
 
 	# otherwise, grab a reference to the video file
 	else:
-		logger.info("Starting the video..")
-		vs = cv2.VideoCapture(args["input"])
+		logger.info("Iniciando el video...")
+		vs = cv2.VideoCapture(config["url"])  # Abre la cámara configurada
 
 	# initialize the video writer (we'll instantiate later if need be)
 	writer = None
@@ -133,6 +139,10 @@ def people_counter():
 		# resize the frame to have a maximum width of 500 pixels (the
 		# less data we have, the faster we can process it), then convert
 		# the frame from BGR to RGB for dlib
+		ret, frame = vs.read()
+		if not ret or frame is None:
+			print("⚠ No se pudo capturar el frame de la cámara.")
+			return
 		frame = imutils.resize(frame, width = 500)
 		rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -150,14 +160,14 @@ def people_counter():
 		# initialize the current status along with our list of bounding
 		# box rectangles returned by either (1) our object detector or
 		# (2) the correlation trackers
-		status = "Waiting"
+		status = "Esperando"
 		rects = []
 
 		# check to see if we should run a more computationally expensive
 		# object detection method to aid our tracker
 		if totalFrames % args["skip_frames"] == 0:
 			# set the status and initialize our new set of object trackers
-			status = "Detecting"
+			status = "Detectando"
 			trackers = []
 
 			# convert the frame to a blob and pass the blob through the
@@ -206,7 +216,7 @@ def people_counter():
 			for tracker in trackers:
 				# set the status of our system to be 'tracking' rather
 				# than 'waiting' or 'detecting'
-				status = "Tracking"
+				status = "Rastreando"
 
 				# update the tracker and grab the updated position
 				tracker.update(rgb)
@@ -225,7 +235,7 @@ def people_counter():
 		# object crosses this line we will determine whether they were
 		# moving 'up' or 'down'
 		cv2.line(frame, (0, H // 2), (W, H // 2), (0, 0, 0), 3)
-		cv2.putText(frame, "-Prediction border - Entrance-", (10, H - ((i * 20) + 200)),
+		cv2.putText(frame, "Línea de conteo - Entrada", (10, H - ((i * 20) + 200)),
 			cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
 
 		# use the centroid tracker to associate the (1) old object
@@ -275,7 +285,7 @@ def people_counter():
 						in_time.append(date_time)
 						# if the people limit exceeds over threshold, send an email alert
 						if sum(total) >= config["Threshold"]:
-							cv2.putText(frame, "-ALERT: People limit exceeded-", (10, frame.shape[0] - 80),
+							cv2.putText(frame, "-ALERTA: Límite de personas superado-", (10, frame.shape[0] - 80),
 								cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 2)
 							if config["ALERT"]:
 								logger.info("Sending email alert..")
@@ -300,13 +310,13 @@ def people_counter():
 
 		# construct a tuple of information we will be displaying on the frame
 		info_status = [
-		("Exit", totalUp),
-		("Enter", totalDown),
-		("Status", status),
+		("Salidas", totalUp),
+		("Entradas", totalDown),
+		("Estado", status),
 		]
 
 		info_total = [
-		("Total people inside", ', '.join(map(str, total))),
+		("Total dentro", ', '.join(map(str, total))),
 		]
 
 		# display the output
@@ -329,6 +339,17 @@ def people_counter():
 		# show the output frame
 		cv2.imshow("Real-Time Monitoring/Analysis Window", frame)
 		key = cv2.waitKey(1) & 0xFF
+		if key == ord("r"):
+			logger.info("Generando y enviando reporte manual...")
+			subprocess.call(["python3", "report_generator.py"])
+			print("📧 Reporte enviado")
+			# Reproducir sonido al enviar
+			if platform.system() == "Darwin":
+				os.system("afplay /System/Library/Sounds/Glass.aiff")
+			elif platform.system() == "Windows":
+				import winsound
+				winsound.MessageBeep()
+
 		# if the `q` key was pressed, break from the loop
 		if key == ord("q"):
 			break
@@ -347,8 +368,8 @@ def people_counter():
 
 	# stop the timer and display FPS information
 	fps.stop()
-	logger.info("Elapsed time: {:.2f}".format(fps.elapsed()))
-	logger.info("Approx. FPS: {:.2f}".format(fps.fps()))
+	logger.info("Tiempo transcurrido: {:.2f}".format(fps.elapsed()))
+	logger.info("FPS aproximado: {:.2f}".format(fps.fps()))
 
 	# release the camera device/resource (issue 15)
 	if config["Thread"]:
@@ -364,4 +385,31 @@ if config["Scheduler"]:
 	while True:
 		schedule.run_pending()
 else:
-	people_counter()
+	# Verificar horario permitido
+	def dentro_del_rango():
+		if not os.path.exists(SCHEDULE_PATH):
+			return False
+		with open(SCHEDULE_PATH, "r") as f:
+			config_s = json.load(f)
+		ahora = datetime.datetime.now()
+		dia_actual = ahora.strftime("%A")
+		hora_actual = ahora.strftime("%H:%M").lstrip("0").rjust(5, "0")
+		if dia_actual not in config_s.get("active_days", []):
+			return False
+		for rango in config_s.get("time_ranges", []):
+			if rango["start"] <= hora_actual <= rango["end"]:
+				return True
+		# Verificación para envío justo al final del rango
+		for rango in config_s.get("time_ranges", []):
+			rango_end = rango["end"].lstrip("0").rjust(5, "0")
+			if hora_actual == rango_end:
+				print("[INFO] Hora final del rango alcanzada. Enviando reporte diario y cerrando cámara...")
+				subprocess.call(["python3", "report_generator.py"])
+				cv2.destroyAllWindows()
+				exit()
+		return False
+
+	if dentro_del_rango():
+		people_counter()
+	else:
+		print("[INFO] Sistema fuera del horario configurado. No se activa la cámara.")

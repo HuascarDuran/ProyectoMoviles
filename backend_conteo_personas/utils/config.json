@@ -1,0 +1,18 @@
+{
+  "Email_Send": "dilanmamanip@gmail.com",
+  "Email_Receive": "dilanmamanip@gmail.com",
+  "Email_Password": "zawp dwpl vsbw pxxu",
+  "url": "http://192.168.0.6:4747/video",
+  "ALERT": false,
+  "Threshold": 10,
+  "Thread": false,
+  "Log": false,
+  "Scheduler": false,
+  "Timer": false,
+  "threshold": 10,
+  "alert": false,
+  "log": false,
+  "timer": false,
+  "skip_frames": 30,
+  "confidence": 0.4
+}

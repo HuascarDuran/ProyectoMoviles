@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+opencv-python
+numpy
+dlib
+scikit-image # dlib puede depender de esta
+scipy
+python-dotenv
