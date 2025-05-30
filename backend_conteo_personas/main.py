@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from report_service import send_daily_report_email
 import uvicorn
 import os
 import json
@@ -203,23 +204,18 @@ async def get_counts():
     with count_lock:
         return current_counts
 
-# --- Endpoint para generar reporte (sin implementar aún la lógica de report_generator.py) ---
 @app.post("/generate_report")
 async def generate_report():
     """Genera un reporte diario y lo envía por correo."""
     try:
-        # Aquí se ejecutaría la lógica de report_generator.py
-        # Podrías importar tu script de report_generator.py y llamarlo aquí.
-        # Por ejemplo:
-        # from report_generator import generate_report_logic
-        # generate_report_logic()
-        print("Simulando la generación y envío de reporte...")
-        # Llama a tu Mailer class o la lógica de report_generator.py aquí
-        # from report_generator import generate_and_send_report (después de crearla)
-        # generate_and_send_report()
-        return {"message": "Reporte generado y enviado (simulado)."}
+        # Lanza el envío del reporte en un hilo separado para no bloquear la API
+        report_thread = threading.Thread(target=send_daily_report_email)
+        report_thread.daemon = True # Esto permite que el hilo se cierre si el proceso principal termina
+        report_thread.start()
+
+        return {"message": "Generando y enviando reporte en segundo plano. Recibirás un correo pronto."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al generar reporte: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al iniciar la generación de reporte: {e}")
 
 
 # --- Iniciar el servidor Uvicorn ---

@@ -14,5 +14,5 @@
   "log": false,
   "timer": false,
   "skip_frames": 30,
-  "confidence": 0.4
+  "confidence": 0.25
 }
